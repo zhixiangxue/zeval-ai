@@ -80,6 +80,30 @@ async def main():
             unit_type=UnitType.TEXT,
             metadata=UnitMetadata(context_path="chapter2/qualification/dti_ratio")
         ),
+        BaseUnit(
+            unit_id="unit_004",
+            content="Closing costs typically range from 2-5% of the home purchase price and include fees for appraisals, inspections, "
+                   "title insurance, and loan origination. Buyers should budget for these costs in addition to the down payment. "
+                   "Some sellers may offer to cover part of the closing costs as a negotiation strategy.",
+            unit_type=UnitType.TEXT,
+            metadata=UnitMetadata(context_path="chapter3/process/closing_costs")
+        ),
+        BaseUnit(
+            unit_id="unit_005",
+            content="Fixed-rate mortgages maintain the same interest rate throughout the loan term, providing predictable monthly payments. "
+                   "Adjustable-rate mortgages (ARMs) start with lower rates that adjust periodically based on market conditions. "
+                   "ARMs typically have a fixed period (e.g., 5/1 ARM means fixed for 5 years, then adjusts annually).",
+            unit_type=UnitType.TEXT,
+            metadata=UnitMetadata(context_path="chapter2/financing/mortgage_types")
+        ),
+        BaseUnit(
+            unit_id="unit_006",
+            content="Pre-approval letters show sellers that you're a serious buyer with financing in place. "
+                   "Getting pre-approved involves submitting financial documents (pay stubs, tax returns, bank statements) to a lender "
+                   "who will verify your income, assets, and creditworthiness. Pre-approval is stronger than pre-qualification.",
+            unit_type=UnitType.TEXT,
+            metadata=UnitMetadata(context_path="chapter1/preparation/pre_approval")
+        ),
     ]
     rprint(f"[green]✓[/green] Created {len(units)} units")
     
@@ -115,16 +139,44 @@ async def main():
         api_key=api_key,
         units=enriched_units,
         personas=personas,
-        num_cases=5,
+        num_cases=10,  # Increase to 10 for more diversity
         domain="US residential real estate"
     )
     rprint(f"[green]✓[/green] Generated {len(dataset.cases)} evaluation cases")
     
-    # Step 5: Display results
+    # Step 5: Display results with statistics
     console = Console()
     console.print("\n" + "="*60)
     console.print("[bold cyan]Generated Evaluation Cases[/bold cyan]")
     console.print("="*60 + "\n")
+    
+    # Calculate statistics
+    from collections import Counter
+    persona_stats = Counter(case.persona['name'] for case in dataset.cases)
+    unit_stats = Counter(case.source_units[0]['unit_id'] for case in dataset.cases if case.source_units)
+    
+    # Display statistics
+    persona_dist = "\n".join(f"  • {name}: {count} cases" for name, count in persona_stats.items())
+    unit_dist = "\n".join(f"  • {unit_id}: {count} cases" for unit_id, count in unit_stats.items())
+    
+    stats_content = f"""[bold]Dataset Statistics:[/bold]
+
+[yellow]Total Cases:[/yellow] {len(dataset.cases)}
+
+[cyan]Persona Distribution:[/cyan]
+{persona_dist}
+
+[magenta]Source Unit Distribution:[/magenta]
+{unit_dist}
+"""
+    
+    console.print(Panel(
+        stats_content,
+        title="[bold white]📊 Statistics[/bold white]",
+        border_style="green",
+        padding=(1, 2)
+    ))
+    console.print()
     
     for i, case in enumerate(dataset.cases, 1):
         # Build case content

@@ -21,6 +21,33 @@ class GeneratedQA(BaseModel):
     answer: str = Field(description="Generated answer")
 
 
+def validate_qa_context_match(question: str, answer: str, context: str) -> tuple[bool, str]:
+    """
+    Validate if the answer can be derived from the context
+    
+    Simple heuristic: check if key answer words appear in context
+    Returns: (is_valid, reason)
+    """
+    # Extract key terms from answer (words longer than 4 chars)
+    answer_words = set(
+        word.lower().strip('.,!?;:') 
+        for word in answer.split() 
+        if len(word) > 4 and word.isalpha()
+    )
+    
+    context_lower = context.lower()
+    
+    # Count how many answer key terms appear in context
+    matched_words = [word for word in answer_words if word in context_lower]
+    match_ratio = len(matched_words) / len(answer_words) if answer_words else 0
+    
+    # Require at least 30% of key terms to appear in context
+    if match_ratio < 0.3:
+        return False, f"Only {match_ratio:.0%} of answer key terms found in context"
+    
+    return True, f"{match_ratio:.0%} match"
+
+
 @dataclass
 class Scenario:
     """Single-hop scenario: specific combination for generation"""
@@ -40,7 +67,10 @@ def prepare_scenarios(
     Strategy (inspired by Ragas):
     1. Generate all possible combinations: unit × theme × persona
     2. Shuffle to randomize
-    3. Sample with deduplication preference
+    3. Sample with strict constraints:
+       - Each unit generates at most 2 questions (avoid DTI-like repetition)
+       - Balanced persona distribution (strict round-robin)
+       - Prefer unique (unit, persona) pairs
     """
     import random
     
@@ -74,9 +104,18 @@ def prepare_scenarios(
     # Step 2: Shuffle to randomize
     random.shuffle(all_combinations)
     
-    # Step 3: Sample with deduplication preference
+    # Step 3: Sample with strict constraints
     selected = []
     unit_persona_set = set()  # Track (unit, persona) pairs
+    unit_count = {}  # Track how many times each unit is used
+    persona_count = {p.name: 0 for p in personas}  # Track persona usage
+    
+    # Calculate target count per persona (strict)
+    target_per_persona = num_scenarios // len(personas)
+    remainder = num_scenarios % len(personas)
+    
+    # Maximum questions per unit (avoid DTI-like repetition)
+    MAX_QUESTIONS_PER_UNIT = 2
     
     for combo in all_combinations:
         if len(selected) >= num_scenarios:
@@ -86,21 +125,37 @@ def prepare_scenarios(
         persona = combo["persona"]
         key = (unit.unit_id, persona.name)
         
-        # Prefer unique (unit, persona) pairs
-        if key not in unit_persona_set:
-            selected.append(Scenario(
-                unit=unit,
-                persona=persona,
-                theme=combo["theme"]
-            ))
-            unit_persona_set.add(key)
-        # Allow duplicates if we haven't reached target
-        elif len(selected) < num_scenarios:
-            selected.append(Scenario(
-                unit=unit,
-                persona=persona,
-                theme=combo["theme"]
-            ))
+        # Constraint 1: Each unit can only generate MAX_QUESTIONS_PER_UNIT questions
+        unit_usage = unit_count.get(unit.unit_id, 0)
+        if unit_usage >= MAX_QUESTIONS_PER_UNIT:
+            continue
+        
+        # Constraint 2: Strict persona balance
+        # Allow +1 for remainder distribution
+        max_for_this_persona = target_per_persona + (1 if remainder > 0 else 0)
+        if persona_count[persona.name] >= max_for_this_persona:
+            continue
+        
+        # Constraint 3: Prefer unique (unit, persona) pairs
+        if key in unit_persona_set:
+            # Only allow duplicates if we're running out of options
+            if len(selected) < num_scenarios * 0.8:  # Still in early phase
+                continue
+        
+        # Accept this scenario
+        selected.append(Scenario(
+            unit=unit,
+            persona=persona,
+            theme=combo["theme"]
+        ))
+        
+        unit_persona_set.add(key)
+        unit_count[unit.unit_id] = unit_usage + 1
+        persona_count[persona.name] += 1
+        
+        # Update remainder counter
+        if persona_count[persona.name] == target_per_persona + 1:
+            remainder -= 1
     
     return selected
 
@@ -151,27 +206,42 @@ async def generate_single_hop(
                 # Build prompt with theme
                 persona_info = f"{scenario.persona.name} ({scenario.persona.expertise_level}): {scenario.persona.role_description}"
                 
-                prompt = f"""Generate a question-answer pair based on the following context, persona, and theme.
+                prompt = f"""Generate a question-answer pair based STRICTLY on the provided context.
 
-Context:
+Context (THIS IS YOUR ONLY SOURCE OF TRUTH):
 {scenario.unit.content}
 
 Persona:
 {persona_info}
 
-Theme/Focus:
+Theme/Focus (use as inspiration, but ONLY answer from context):
 {scenario.theme}
 
-Requirements:
-1. Generate a question that this persona would ask about the theme: {scenario.theme}
-2. The question should be relevant to their focus area: {scenario.persona.focus_area}
-3. The answer must be entirely based on the provided context
-4. Do not add information not present in the context
-5. The question should be natural and realistic
+CRITICAL REQUIREMENTS:
+1. The question should be relevant to the theme: {scenario.theme}
+2. The question should match the persona's focus area: {scenario.persona.focus_area}
+3. **The answer MUST ONLY use information from the context above**
+4. **If the context doesn't contain information to answer the question, DO NOT generate this pair**
+5. **DO NOT add any information not explicitly stated in the context**
+6. The question should be natural and realistic
+
+Example of WRONG answer: Adding information beyond the context
+Example of RIGHT answer: Only using facts directly from the context
 """
                 
                 # Generate QA pair
                 result = await conv.asend(prompt, returns=GeneratedQA)
+                
+                # Validate answer-context match
+                is_valid, reason = validate_qa_context_match(
+                    result.question, 
+                    result.answer, 
+                    scenario.unit.content
+                )
+                
+                if not is_valid:
+                    rprint(f"[yellow]⚠[/yellow] Case {index+1} validation failed: {reason}")
+                    return None
                 
                 # Build source_unit dict
                 source_unit = {
