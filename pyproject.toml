@@ -1,0 +1,85 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zeval"
+version = "0.1.0"
+description = "AI evaluation framework for synthetic data generation and evaluation"
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "zhixiang", email = "zhixiang.xzx@gmail.com"}
+]
+keywords = ["ai", "evaluation", "synthetic-data", "rag", "llm"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "chakpy>=0.2.3",
+    "pydantic>=2.0.0",
+    "tenacity>=8.0.0",
+    "rich>=13.0.0",
+    "python-dotenv>=1.0.0",
+    "numpy>=1.24.0",
+    "networkx>=3.0",
+    "rapidfuzz>=3.0.0",
+    "docling>=2.0.0",
+    "markitdown>=0.0.1a2",
+    "mineru>=2.7.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/zeval-ai"
+Repository = "https://github.com/yourusername/zeval-ai"
+Documentation = "https://github.com/yourusername/zeval-ai#readme"
+
+[project.scripts]
+zeval = "zeval.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["zeval*"]
+exclude = ["tests*", "venv*"]
+
+[tool.setuptools.package-data]
+zeval = ["py.typed"]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+select = ["E", "F", "I", "N", "W"]
+ignore = []
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --cov=zeval --cov-report=term-missing"
