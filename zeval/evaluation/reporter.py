@@ -90,7 +90,7 @@ class EvaluationReporter:
         Args:
             dataset: In-memory dataset (if already available)
             dataset_path: Path to load dataset from JSON (if not in memory)
-            output_path: Path to save markdown report (optional)
+            output_path: Directory path to save report files
             export_csv: Whether to export CSV files (default: True)
             
         Returns:
@@ -123,15 +123,11 @@ class EvaluationReporter:
         
         # Save to file if requested
         if output_path:
-            output_file = Path(output_path)
-            
-            # Create timestamped directory
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            report_dir = output_file.parent / f"report_{timestamp}"
+            report_dir = Path(output_path)
             report_dir.mkdir(parents=True, exist_ok=True)
             
-            # Save markdown report in timestamped directory
-            report_file = report_dir / output_file.name
+            # Save markdown report
+            report_file = report_dir / "evaluation_report.md"
             report_file.write_text(report, encoding='utf-8')
             
             print(f"Report saved to: {report_file}")
