@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from ...schemas.unit import BaseUnit
 from ...schemas.eval import EvalCase, EvalDataset
+from ..filters import Filter
 from .persona import Persona
 
 
@@ -167,7 +168,8 @@ async def generate_single_hop(
     personas: list[Persona],
     num_cases: int = 10,
     domain: str | None = None,
-    max_concurrent: int = 5,  # Concurrency limit
+    max_concurrent: int = 5,
+    filter: Filter | None = None,  # Optional filter object
 ) -> EvalDataset:
     """
     Generate single-hop evaluation dataset with scenario-based sampling
@@ -184,6 +186,7 @@ async def generate_single_hop(
         num_cases: Number of cases to generate (default: 10)
         domain: Domain description (optional)
         max_concurrent: Maximum concurrent LLM calls (default: 5)
+        filter: Optional Filter object for quality control
     
     Returns:
         EvalDataset containing generated evaluation cases
@@ -291,8 +294,16 @@ Example of RIGHT answer: Only using facts directly from the context
     else:
         rprint(f"[green]✓[/green] Successfully generated all {len(cases)} cases")
     
-    return EvalDataset(
+    # Create dataset
+    dataset = EvalDataset(
         cases=cases,
         domain=domain,
         generated_at=datetime.now().isoformat()
     )
+    
+    # Post-process: apply filter if provided
+    if filter is not None:
+        rprint("\n[cyan]Applying quality filter...[/cyan]")
+        dataset = await filter.filter(dataset)
+    
+    return dataset

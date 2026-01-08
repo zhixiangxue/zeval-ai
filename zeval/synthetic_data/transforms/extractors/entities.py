@@ -77,7 +77,8 @@ Output:"""
         """Extract entities and update unit.entities"""
         try:
             prompt = self.build_prompt(unit)
-            result = await self.conv.asend(prompt, returns=EntitiesSchema)
+            conv = self.create_conv()  # Create new conversation for each extraction
+            result = await conv.asend(prompt, returns=EntitiesSchema)
             unit.entities = result.entities
             return True
         except Exception as e:

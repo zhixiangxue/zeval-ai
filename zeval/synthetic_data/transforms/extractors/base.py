@@ -38,17 +38,13 @@ class BaseExtractor(ABC):
     def __init__(self, model_uri: str, api_key: str):
         self.model_uri = model_uri
         self.api_key = api_key
-        self._conv: Optional[chak.Conversation] = None
     
-    @property
-    def conv(self) -> chak.Conversation:
-        """Lazy-load Conversation instance"""
-        if self._conv is None:
-            self._conv = chak.Conversation(
-                self.model_uri,
-                api_key=self.api_key
-            )
-        return self._conv
+    def create_conv(self) -> chak.Conversation:
+        """Create a new Conversation instance for each extraction"""
+        return chak.Conversation(
+            self.model_uri,
+            api_key=self.api_key
+        )
     
     @abstractmethod
     async def extract(self, unit: BaseUnit) -> bool:

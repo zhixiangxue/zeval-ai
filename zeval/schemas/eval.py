@@ -2,6 +2,7 @@
 
 from pydantic import BaseModel, Field
 from typing import Any
+from datetime import datetime
 import json
 import csv
 from pathlib import Path
@@ -55,6 +56,28 @@ class EvalCase(BaseModel):
         default_factory=dict,
         description="Generation parameters (style, length, etc.)"
     )
+    
+    # Evaluation results: key is metric_name, value is EvalResult
+    results: dict[str, "EvalResult"] = Field(
+        default_factory=dict,
+        description="Evaluation results from different metrics"
+    )
+    
+    def add_result(self, result: "EvalResult") -> None:
+        """Add an evaluation result from a metric"""
+        self.results[result.metric_name] = result
+    
+    def get_score(self, metric_name: str) -> float | None:
+        """Get score for a specific metric"""
+        result = self.results.get(metric_name)
+        return result.score if result else None
+    
+    @property
+    def overall_score(self) -> float:
+        """Overall score (average of all metrics)"""
+        if not self.results:
+            return 0.0
+        return sum(r.score for r in self.results.values()) / len(self.results)
 
 
 class EvalDataset(BaseModel):
@@ -69,6 +92,16 @@ class EvalDataset(BaseModel):
     
     def __len__(self):
         return len(self.cases)
+    
+    @classmethod
+    def from_json(cls, path: str) -> "EvalDataset":
+        """Load dataset from JSON file"""
+        input_path = Path(path)
+        
+        with open(input_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        return cls(**data)
     
     def to_json(self, path: str):
         """Export as JSON file"""
@@ -131,3 +164,32 @@ class EvalDataset(BaseModel):
                     'generation_params': json.dumps(case.generation_params, ensure_ascii=False)
                 }
                 writer.writerow(row)
+
+
+class EvalResult(BaseModel):
+    """
+    Evaluation result from a metric for a single case
+    
+    Represents the outcome of evaluating one EvalCase with one metric.
+    Contains the metric name, score, reasoning, and optional details.
+    
+    Attributes:
+        metric_name: Name of the metric (e.g., 'faithfulness')
+        score: Evaluation score, typically 0.0-1.0 (higher is better)
+        reason: Brief explanation of the score
+        details: Metric-specific detailed information
+        elapsed_time: Time taken for evaluation (seconds)
+        evaluated_at: Timestamp when evaluation was performed
+    """
+    metric_name: str = Field(description="Metric name")
+    score: float = Field(description="Evaluation score (0.0-1.0)")
+    reason: str | None = Field(default=None, description="Score explanation")
+    details: dict[str, Any] | None = Field(
+        default=None,
+        description="Metric-specific details (e.g., statements, verdicts)"
+    )
+    elapsed_time: float | None = Field(default=None, description="Evaluation time (seconds)")
+    evaluated_at: str = Field(
+        default_factory=lambda: datetime.now().isoformat(),
+        description="Evaluation timestamp"
+    )

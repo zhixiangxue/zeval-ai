@@ -67,7 +67,8 @@ Output:"""
         """Extract summary and update unit.summary"""
         try:
             prompt = self.build_prompt(unit)
-            result = await self.conv.asend(prompt, returns=SummarySchema)
+            conv = self.create_conv()  # Create new conversation for each extraction
+            result = await conv.asend(prompt, returns=SummarySchema)
             unit.summary = result.summary
             return True
         except Exception as e:

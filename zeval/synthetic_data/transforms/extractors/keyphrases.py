@@ -76,7 +76,8 @@ Output:"""
         """Extract keyphrases and update unit.keyphrases"""
         try:
             prompt = self.build_prompt(unit)
-            result = await self.conv.asend(prompt, returns=KeyphrasesSchema)
+            conv = self.create_conv()  # Create new conversation for each extraction
+            result = await conv.asend(prompt, returns=KeyphrasesSchema)
             unit.keyphrases = result.keyphrases
             return True
         except Exception as e:
