@@ -21,11 +21,11 @@ from ..schemas.eval import EvalDataset, EvalCase
 class MetricStats(BaseModel):
     """Statistics for a single metric"""
     name: str
-    avg_score: float
-    min_score: float
-    max_score: float
-    std_dev: float
-    count: int
+    avg_score: float  # 平均分
+    min_score: float  # 最低分
+    max_score: float  # 最高分
+    std_dev: float    # 标准差：衡量分数的离散程度，值越大说明不同case之间分数差异越大
+    count: int        # 样本数量
 
 
 class ExecutiveSummary(BaseModel):
@@ -161,8 +161,15 @@ class EvaluationReporter:
                     scores.append(result.score)
             
             if scores:
+                # 计算平均分
                 avg = sum(scores) / len(scores)
+                
+                # 计算方差：每个分数与平均分的差的平方和 / 样本数
                 variance = sum((s - avg) ** 2 for s in scores) / len(scores)
+                
+                # 标准差：方差的平方根，表示分数的离散程度
+                # 标准差小（如 0.1）：所有 case 分数接近平均分，系统表现稳定
+                # 标准差大（如 0.4）：case 分数差异大，有的很好有的很差，系统不稳定
                 std_dev = variance ** 0.5
                 
                 stats[metric_name] = MetricStats(
@@ -807,6 +814,8 @@ class EvaluationReporter:
             'Overall Score',
             'Status'
         ] + self.METRIC_NAMES + [
+            'Persona Name',
+            'Persona Role',
             'Question',
             'Answer',
             'Ground Truth Answer',
@@ -845,6 +854,14 @@ class EvaluationReporter:
                 f"{idx+1}. {ctx}" for idx, ctx in enumerate(case.ground_truth_contexts)
             ])
             
+            # Extract persona info
+            if case.persona:
+                persona_name = case.persona.get('name', 'N/A')
+                persona_role = case.persona.get('role_description', 'N/A')
+            else:
+                persona_name = 'N/A'
+                persona_role = 'N/A'
+            
             # Build row: scores first, then details
             row = [
                 i,
@@ -862,6 +879,8 @@ class EvaluationReporter:
             
             # Add detailed information
             row.extend([
+                persona_name,
+                persona_role,
                 case.question,
                 case.answer or "N/A",
                 case.ground_truth_answer,
@@ -890,13 +909,13 @@ class EvaluationReporter:
                     cell.border = thin_border
             
             # Add borders to non-colored cells
-            for col_idx in [1, 3] + list(range(4 + len(self.METRIC_NAMES), 4 + len(self.METRIC_NAMES) + 5)):
+            for col_idx in [1, 3] + list(range(4 + len(self.METRIC_NAMES), 4 + len(self.METRIC_NAMES) + 7)):
                 cell = ws_cases.cell(row=row_idx, column=col_idx)
                 cell.border = thin_border
             
             # Enable text wrapping for long text fields
             for col in [row_idx]:
-                for text_col in range(4 + len(self.METRIC_NAMES), 4 + len(self.METRIC_NAMES) + 5):
+                for text_col in range(4 + len(self.METRIC_NAMES), 4 + len(self.METRIC_NAMES) + 7):
                     cell = ws_cases.cell(row=row_idx, column=text_col)
                     cell.alignment = Alignment(wrap_text=True, vertical='top')
         
@@ -911,11 +930,13 @@ class EvaluationReporter:
         
         # Detail columns (after metrics)
         detail_col_start = 68 + len(self.METRIC_NAMES)  # ASCII code
-        ws_cases.column_dimensions[chr(detail_col_start)].width = 60      # Question
-        ws_cases.column_dimensions[chr(detail_col_start + 1)].width = 60  # Answer
-        ws_cases.column_dimensions[chr(detail_col_start + 2)].width = 60  # Ground Truth Answer
-        ws_cases.column_dimensions[chr(detail_col_start + 3)].width = 80  # Retrieved Contexts
-        ws_cases.column_dimensions[chr(detail_col_start + 4)].width = 80  # Ground Truth Contexts
+        ws_cases.column_dimensions[chr(detail_col_start)].width = 20      # Persona Name
+        ws_cases.column_dimensions[chr(detail_col_start + 1)].width = 30  # Persona Role
+        ws_cases.column_dimensions[chr(detail_col_start + 2)].width = 60  # Question
+        ws_cases.column_dimensions[chr(detail_col_start + 3)].width = 60  # Answer
+        ws_cases.column_dimensions[chr(detail_col_start + 4)].width = 60  # Ground Truth Answer
+        ws_cases.column_dimensions[chr(detail_col_start + 5)].width = 80  # Retrieved Contexts
+        ws_cases.column_dimensions[chr(detail_col_start + 6)].width = 80  # Ground Truth Contexts
         
         # Save workbook
         excel_path = output_dir / "evaluation_report.xlsx"

@@ -25,10 +25,44 @@ console = Console()
 
 
 def create_comprehensive_test_cases() -> list[EvalCase]:
-    """Create test cases covering all metrics"""
+    """Create test cases covering all metrics with complete persona and source_units data"""
+    
+    # Define personas for different test cases
+    personas = [
+        {
+            "name": "First-Time Home Buyer",
+            "role_description": "A young professional looking to purchase their first home with limited savings and basic knowledge of the mortgage process.",
+            "expertise_level": "beginner",
+            "focus_area": "FHA loans and down payment requirements"
+        },
+        {
+            "name": "Real Estate Investor",
+            "role_description": "An experienced investor evaluating multiple mortgage options for rental properties and seeking optimal financing strategies.",
+            "expertise_level": "expert",
+            "focus_area": "Mortgage comparison and investment analysis"
+        },
+        {
+            "name": "Financial Advisor",
+            "role_description": "A licensed professional helping clients understand various mortgage products and their long-term financial implications.",
+            "expertise_level": "expert",
+            "focus_area": "Comprehensive mortgage product knowledge"
+        },
+        {
+            "name": "Home Refinancing Seeker",
+            "role_description": "A current homeowner exploring refinancing options to reduce monthly payments or access home equity.",
+            "expertise_level": "intermediate",
+            "focus_area": "Interest rates and refinancing strategies"
+        },
+        {
+            "name": "Mortgage Applicant",
+            "role_description": "A prospective borrower gathering documentation and understanding the pre-approval process requirements.",
+            "expertise_level": "beginner",
+            "focus_area": "Mortgage application and qualification process"
+        },
+    ]
     
     cases = [
-        # Case 1: Perfect case - everything is correct
+        # Case 1: Perfect case - everything is correct (single-hop)
         EvalCase(
             question="What is the minimum down payment for FHA loans?",
             answer="FHA loans require a minimum down payment of 3.5%.",
@@ -39,9 +73,26 @@ def create_comprehensive_test_cases() -> list[EvalCase]:
             ground_truth_contexts=[
                 "FHA loans allow first-time homebuyers to make down payments as low as 3.5%. These loans are backed by the Federal Housing Administration.",
             ],
+            persona=personas[0],
+            source_units=[
+                {
+                    "unit_id": "unit_fha_001",
+                    "content": "FHA loans allow first-time homebuyers to make down payments as low as 3.5%. These loans are backed by the Federal Housing Administration.",
+                    "metadata": {
+                        "source": "FHA Loan Guidelines 2024.pdf",
+                        "page": 12,
+                        "section": "Down Payment Requirements"
+                    }
+                }
+            ],
+            generation_params={
+                "style": "simple",
+                "length": "short",
+                "complexity": "beginner"
+            }
         ),
         
-        # Case 2: Good answer with complete information
+        # Case 2: Good answer with complete information (multi-hop)
         EvalCase(
             question="What are the requirements for FHA loans?",
             answer="FHA loans require a minimum down payment of 3.5% and a credit score of at least 580.",
@@ -56,9 +107,44 @@ def create_comprehensive_test_cases() -> list[EvalCase]:
                 "Borrowers typically need a credit score of 580 or higher for FHA loans.",
                 "FHA loans require mortgage insurance premiums to protect lenders.",
             ],
+            persona=personas[0],
+            source_units=[
+                {
+                    "unit_id": "unit_fha_002",
+                    "content": "FHA loans allow down payments as low as 3.5% for qualified borrowers.",
+                    "metadata": {
+                        "source": "FHA Loan Guidelines 2024.pdf",
+                        "page": 12,
+                        "section": "Down Payment Requirements"
+                    }
+                },
+                {
+                    "unit_id": "unit_fha_003",
+                    "content": "Borrowers typically need a credit score of 580 or higher for FHA loans.",
+                    "metadata": {
+                        "source": "FHA Loan Guidelines 2024.pdf",
+                        "page": 15,
+                        "section": "Credit Requirements"
+                    }
+                },
+                {
+                    "unit_id": "unit_fha_004",
+                    "content": "FHA loans require mortgage insurance premiums to protect lenders.",
+                    "metadata": {
+                        "source": "FHA Loan Guidelines 2024.pdf",
+                        "page": 23,
+                        "section": "Insurance Requirements"
+                    }
+                }
+            ],
+            generation_params={
+                "style": "comprehensive",
+                "length": "medium",
+                "complexity": "beginner"
+            }
         ),
         
-        # Case 3: Answer with some issues
+        # Case 3: Answer with some issues (single-hop)
         EvalCase(
             question="What are the benefits of fixed-rate mortgages?",
             answer="Fixed-rate mortgages offer predictable monthly payments and protection against rising interest rates. They also have very low closing costs.",  # Last sentence is hallucination
@@ -72,9 +158,26 @@ def create_comprehensive_test_cases() -> list[EvalCase]:
                 "Fixed-rate mortgages maintain the same interest rate throughout the loan term, providing predictable monthly payments.",
                 "Fixed-rate mortgages protect borrowers from rising interest rates by locking in the rate.",
             ],
+            persona=personas[2],
+            source_units=[
+                {
+                    "unit_id": "unit_mortgage_001",
+                    "content": "Fixed-rate mortgages maintain the same interest rate throughout the loan term, providing predictable monthly payments. Fixed-rate mortgages protect borrowers from rising interest rates by locking in the rate.",
+                    "metadata": {
+                        "source": "Mortgage Products Overview.pdf",
+                        "page": 8,
+                        "section": "Fixed-Rate Mortgages"
+                    }
+                }
+            ],
+            generation_params={
+                "style": "detailed",
+                "length": "medium",
+                "complexity": "intermediate"
+            }
         ),
         
-        # Case 4: Poor retrieval quality
+        # Case 4: Poor retrieval quality (single-hop)
         EvalCase(
             question="What is the interest rate for FHA loans?",
             answer="FHA loan interest rates vary based on market conditions, credit score, and down payment amount.",
@@ -87,9 +190,26 @@ def create_comprehensive_test_cases() -> list[EvalCase]:
             ground_truth_contexts=[
                 "FHA loan interest rates are competitive and depend on various factors.",
             ],
+            persona=personas[3],
+            source_units=[
+                {
+                    "unit_id": "unit_interest_001",
+                    "content": "FHA loan interest rates are competitive and depend on various factors including market conditions, borrower's credit score, and down payment amount.",
+                    "metadata": {
+                        "source": "Interest Rate Guide 2024.pdf",
+                        "page": 5,
+                        "section": "FHA Interest Rates"
+                    }
+                }
+            ],
+            generation_params={
+                "style": "technical",
+                "length": "short",
+                "complexity": "intermediate"
+            }
         ),
         
-        # Case 5: Completely off-topic answer
+        # Case 5: Completely off-topic answer (multi-hop)
         EvalCase(
             question="How do I qualify for a mortgage pre-approval?",
             answer="The weather is nice today and suitable for outdoor activities.",
@@ -102,6 +222,32 @@ def create_comprehensive_test_cases() -> list[EvalCase]:
                 "Mortgage pre-approval requires submitting pay stubs, W-2 forms, and tax returns to verify income.",
                 "Lenders check your employment history and contact your employer during pre-approval.",
             ],
+            persona=personas[4],
+            source_units=[
+                {
+                    "unit_id": "unit_preapproval_001",
+                    "content": "Mortgage pre-approval requires submitting pay stubs, W-2 forms, and tax returns to verify income.",
+                    "metadata": {
+                        "source": "Pre-Approval Process Guide.pdf",
+                        "page": 3,
+                        "section": "Income Documentation"
+                    }
+                },
+                {
+                    "unit_id": "unit_preapproval_002",
+                    "content": "Lenders check your employment history and contact your employer during pre-approval. Additional asset verification may be required.",
+                    "metadata": {
+                        "source": "Pre-Approval Process Guide.pdf",
+                        "page": 4,
+                        "section": "Employment Verification"
+                    }
+                }
+            ],
+            generation_params={
+                "style": "simple",
+                "length": "medium",
+                "complexity": "beginner"
+            }
         ),
     ]
     

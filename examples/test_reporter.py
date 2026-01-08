@@ -55,7 +55,7 @@ async def main():
         output_path=output_path
     )
     
-    console.print(f"\n✓ Report generated and saved to {output_path}\n", style="green")
+    console.print(f"\n✓ Report generated successfully\n", style="green")
     
     # Step 4: Display report preview
     console.print("="*70)
@@ -67,10 +67,11 @@ async def main():
     
     if len(report) > 2000:
         console.print("\n...")
-        console.print(f"\n[Full report has {len(report)} characters, saved to {output_path}]", style="dim")
+        console.print(f"\n[Full report has {len(report)} characters]\n", style="dim")
     
-    console.print("\n" + "="*70)
-    console.print(f"✓ Report successfully generated: {output_path}", style="bold green")
+    console.print("="*70)
+    console.print("✓ Report successfully generated", style="bold green")
+    console.print("  Check the timestamped folder in output/ directory", style="dim")
     console.print("="*70 + "\n")
 
 
