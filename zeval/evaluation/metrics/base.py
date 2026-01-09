@@ -53,12 +53,10 @@ class BaseMetric(ABC):
         self, 
         cases: List[EvalCase], 
         concurrency: int = 10, 
-        timeout: float = 120.0,
-        show_progress: bool = True,
-        progress_callback = None
+        timeout: float = 120.0
     ) -> None:
         """
-        Evaluate a batch of cases concurrently with optional progress display
+        Evaluate a batch of cases concurrently with progress display
         
         Results are written directly into case.results[self.name].
         
@@ -66,33 +64,22 @@ class BaseMetric(ABC):
             cases: List of evaluation cases
             concurrency: Maximum concurrent evaluations
             timeout: Timeout for each case evaluation in seconds (default: 120s)
-            show_progress: Whether to show progress bar (default: True)
-            progress_callback: Optional callback(completed, total) for external progress tracking
         """
         semaphore = asyncio.Semaphore(concurrency)
-        completed_count = 0
-        total_count = len(cases)
         
         # Setup progress display
-        if show_progress and not progress_callback:
-            progress = Progress(
-                SpinnerColumn(),
-                TextColumn("[cyan]{task.description}"),
-                BarColumn(),
-                TextColumn("[progress.percentage]{task.completed}/{task.total}"),
-            )
-            progress.start()
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[cyan]{task.description}"),
+            BarColumn(),
+            TextColumn("{task.completed}/{task.total}"),
+        ) as progress:
             task_id = progress.add_task(
-                f"[cyan]Evaluating {self.name}",
-                total=total_count
+                f"Evaluating {self.name}",
+                total=len(cases)
             )
-        else:
-            progress = None
-            task_id = None
-        
-        try:
+            
             async def eval_one(case: EvalCase, index: int):
-                nonlocal completed_count
                 async with semaphore:
                     start_time = time.time()
                     try:
@@ -111,7 +98,6 @@ class BaseMetric(ABC):
                             reason=f"Evaluation timeout after {timeout}s",
                             elapsed_time=timeout,
                         ))
-                        print(f"\n[WARNING] Case {index+1} timeout after {timeout}s")
                     except Exception as e:
                         # On failure, still record a result with score 0
                         case.add_result(EvalResult(
@@ -120,19 +106,10 @@ class BaseMetric(ABC):
                             reason=f"Evaluation failed: {str(e)}",
                             elapsed_time=time.time() - start_time,
                         ))
-                        print(f"\n[ERROR] Case {index+1} failed: {e}")
                     finally:
-                        completed_count += 1
-                        
                         # Update progress
-                        if progress and task_id is not None:
-                            progress.update(task_id, completed=completed_count)
-                        if progress_callback:
-                            progress_callback(completed_count, total_count)
+                        progress.update(task_id, advance=1)
             
             # Evaluate all cases concurrently
             tasks = [eval_one(case, i) for i, case in enumerate(cases)]
             await asyncio.gather(*tasks)
-        finally:
-            if progress:
-                progress.stop()

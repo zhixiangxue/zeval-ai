@@ -25,17 +25,23 @@ import asyncio
 import os
 import sys
 import ssl
+import logging
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 from pydantic import BaseModel, Field
 from chak import Conversation
 
 # Disable SSL verification for HuggingFace downloads
 ssl._create_default_https_context = ssl._create_unverified_context
+
+# Suppress HTTP request logs that break progress bar rendering
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
 
 # Load environment variables
 load_dotenv()
@@ -61,7 +67,7 @@ from zeval.evaluation.metrics import (
 )
 from zeval.evaluation.runner import MetricRunner
 from zeval.evaluation.reporter import EvaluationReporter
-from zeval.schemas.eval import EvalDataset
+from zeval.schemas.eval import EvalDataset, EvalCase
 from zeval.schemas.unit import BaseUnit
 
 console = Console()
@@ -135,6 +141,47 @@ Please provide:
             answer="I don't have enough information to answer this question.",
             retrieved_contexts=["No context available"]
         )
+
+
+async def fill_dataset_with_rag(
+    dataset: EvalDataset,
+    llm_uri: str,
+    api_key: str,
+    max_concurrent: int = 5
+) -> None:
+    """
+    Fill dataset cases with RAG-generated answers and retrieved contexts
+    
+    Args:
+        dataset: Dataset with generated questions
+        llm_uri: LLM endpoint
+        api_key: API key
+        max_concurrent: Maximum concurrent RAG calls (default: 5)
+    """
+    semaphore = asyncio.Semaphore(max_concurrent)
+    
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[cyan]{task.description}"),
+        BarColumn(),
+        TextColumn("{task.completed}/{task.total}"),
+    ) as progress:
+        task_id = progress.add_task("Processing RAG calls", total=len(dataset.cases))
+        
+        async def process_case(case: EvalCase):
+            async with semaphore:
+                rag_response = await call_mock_rag(
+                    question=case.question,
+                    llm_uri=llm_uri,
+                    api_key=api_key
+                )
+                case.answer = rag_response.answer
+                case.retrieved_contexts = rag_response.retrieved_contexts
+                progress.update(task_id, advance=1)
+        
+        # Execute all tasks concurrently
+        tasks = [process_case(case) for case in dataset.cases]
+        await asyncio.gather(*tasks)
 
 
 # ============================================================================
@@ -360,32 +407,16 @@ async def main():
     console.print("\n[bold yellow]Stage 5.5: Calling Mock RAG Server[/bold yellow]")
     console.print("-" * 80)
     
-    console.print("🤖 Simulating RAG system calls...")
+    console.print("🤖 Simulating RAG system calls...\n")
     
-    # Call mock RAG with concurrency control
-    semaphore = asyncio.Semaphore(5)  # Max 5 concurrent calls
+    await fill_dataset_with_rag(
+        dataset=dataset,
+        llm_uri=llm_uri,
+        api_key=api_key,
+        max_concurrent=5
+    )
     
-    async def process_case_with_semaphore(case, index, total):
-        async with semaphore:
-            console.print(f"  Processing {index}/{total}...", end="\r")
-            rag_response = await call_mock_rag(
-                question=case.question,
-                llm_uri=llm_uri,
-                api_key=api_key
-            )
-            case.answer = rag_response.answer
-            case.retrieved_contexts = rag_response.retrieved_contexts
-    
-    # Create tasks for all cases
-    tasks = [
-        process_case_with_semaphore(case, i, len(dataset.cases))
-        for i, case in enumerate(dataset.cases, 1)
-    ]
-    
-    # Execute all tasks concurrently
-    await asyncio.gather(*tasks)
-    
-    console.print(f"[green]✓[/green] All {len(dataset.cases)} cases processed by RAG")
+    console.print(f"\n[green]✓[/green] All {len(dataset.cases)} cases processed by RAG")
     
     # ============================================================================
     # Stage 6: Evaluate with All Metrics
@@ -393,7 +424,7 @@ async def main():
     console.print("\n[bold yellow]Stage 6: Running Evaluation[/bold yellow]")
     console.print("-" * 80)
     
-    console.print("📊 Evaluating with all metrics...")
+    console.print("📊 Evaluating with all metrics...\n")
     
     metrics = [
         Faithfulness(llm_uri=llm_uri, api_key=api_key),
@@ -407,7 +438,7 @@ async def main():
     runner = MetricRunner(metrics=metrics)
     await runner.run(dataset)
     
-    console.print(f"[green]✓[/green] Evaluation completed")
+    console.print(f"\n[green]✓[/green] Evaluation completed")
     
     # Show sample results
     if dataset.cases:
