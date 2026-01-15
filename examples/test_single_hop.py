@@ -11,7 +11,6 @@ from rich.panel import Panel
 from rich.console import Console
 
 from zeval.synthetic_data.transforms.extractors import KeyphrasesExtractor, EntitiesExtractor, SummaryExtractor
-from zeval.synthetic_data.transforms.pipeline import TransformPipeline
 from zeval.synthetic_data.generators.persona import Persona, generate_personas
 from zeval.synthetic_data.generators.single_hop import generate_single_hop
 from zeval.schemas.eval import EvalCase, EvalDataset
@@ -109,14 +108,12 @@ async def main():
     
     # Step 2: Enrich units
     rprint("\n[bold][Step 2][/bold] Enriching units...")
-    pipeline = TransformPipeline(
-        extractors=[
-            SummaryExtractor(model_uri=llm_uri, api_key=api_key),
-            KeyphrasesExtractor(model_uri=llm_uri, api_key=api_key),
-            EntitiesExtractor(model_uri=llm_uri, api_key=api_key),
-        ]
+    extractor = (
+        SummaryExtractor(model_uri=llm_uri, api_key=api_key)
+        | KeyphrasesExtractor(model_uri=llm_uri, api_key=api_key)
+        | EntitiesExtractor(model_uri=llm_uri, api_key=api_key)
     )
-    enriched_units = await pipeline.transform(units)
+    enriched_units = await extractor.transform(units)
     rprint(f"[green]✓[/green] Enriched {len(enriched_units)} units")
     
     # Step 3: Generate personas

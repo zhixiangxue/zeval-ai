@@ -1,10 +1,9 @@
-"""
-Complete E2E Test: PDF → Read → Split → Transform → Generate → Evaluate → Report
+"""Complete E2E Test: PDF -> Read -> Split -> Transform -> Generate -> Evaluate -> Report
 
 This script demonstrates the complete workflow:
 1. Read a PDF file using DoclingReader
 2. Split into units using MarkdownHeaderSplitter
-3. Enrich units with TransformPipeline (summary, keyphrases, entities)
+3. Enrich units with extractors (summary, keyphrases, entities)
 4. Generate personas
 5. Generate single-hop Q&A pairs
 6. Evaluate with all metrics
@@ -49,7 +48,6 @@ load_dotenv()
 # Import all required components
 from zeval.synthetic_data.readers.docling import DoclingReader
 from zeval.synthetic_data.splitters.markdown import MarkdownHeaderSplitter
-from zeval.synthetic_data.transforms import TransformPipeline
 from zeval.synthetic_data.transforms.extractors import (
     SummaryExtractor,
     KeyphrasesExtractor,
@@ -318,16 +316,13 @@ async def main():
     
     console.print("🔍 Extracting summaries, keyphrases, and entities...")
     
-    pipeline = TransformPipeline(
-        extractors=[
-            SummaryExtractor(model_uri=llm_uri, api_key=api_key, max_sentences=2),
-            KeyphrasesExtractor(model_uri=llm_uri, api_key=api_key, max_num=5),
-            EntitiesExtractor(model_uri=llm_uri, api_key=api_key, max_num=5),
-        ],
-        max_concurrency=3  # Lower for stability
+    extractor = (
+        SummaryExtractor(model_uri=llm_uri, api_key=api_key, max_sentences=2)
+        | KeyphrasesExtractor(model_uri=llm_uri, api_key=api_key, max_num=5)
+        | EntitiesExtractor(model_uri=llm_uri, api_key=api_key, max_num=5)
     )
     
-    enriched_units = await pipeline.transform(units)
+    enriched_units = await extractor.transform(units, max_concurrency=3)
     
     console.print(f"[green]✓[/green] Enriched {len(enriched_units)} units")
     

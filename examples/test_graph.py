@@ -7,7 +7,6 @@ import os
 from dotenv import load_dotenv
 from zeval.schemas.markdown import Markdown
 from zeval.schemas.base import DocumentMetadata, BaseUnit, UnitMetadata
-from zeval.synthetic_data.transforms import TransformPipeline
 from zeval.synthetic_data.transforms.extractors import (
     SummaryExtractor,
     KeyphrasesExtractor,
@@ -116,8 +115,11 @@ async def main():
     ]
     
     print("\n⏳ Extracting keyphrases and entities...")
-    pipeline = TransformPipeline(extractors=extractors, max_concurrency=5)
-    enriched_units = await pipeline.transform(units)
+    extractor = (
+        KeyphrasesExtractor(model_uri="bailian/qwen-plus", api_key=api_key, max_num=5)
+        | EntitiesExtractor(model_uri="bailian/qwen-plus", api_key=api_key, max_num=5)
+    )
+    enriched_units = await extractor.transform(units, max_concurrency=5)
     print("✓ Extraction completed")
     
     # Display extracted properties

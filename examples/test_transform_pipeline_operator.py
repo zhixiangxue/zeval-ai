@@ -1,4 +1,9 @@
-"""Test extractor pipeline with | operator
+"""
+Test extractor pipeline with | operator (new style)
+
+This example demonstrates the new pipeline-style API:
+    extractor = summary | entities | keyphrases
+    await extractor.transform(units)
 """
 
 import asyncio
@@ -69,17 +74,17 @@ Deep learning uses neural networks with multiple layers to process complex patte
 
 
 async def main():
-    """Test transformation pipeline"""
+    """Test transformation with | operator"""
     
     # Check for API key
     api_key = os.getenv("BAILIAN_API_KEY")
     if not api_key:
         print("Error: BAILIAN_API_KEY environment variable not set")
-        print("Please set it with: export OPENAIBAILIAN_API_KEY_API_KEY='your-key'")
+        print("Please set it with: export BAILIAN_API_KEY='your-key'")
         return
     
     print("\n" + "="*60)
-    print("Testing Extractor Pipeline Operator")
+    print("Testing Pipeline Operator (|)")
     print("="*60)
     
     # 1. Create test units
@@ -87,7 +92,7 @@ async def main():
     print(f"\n✓ Created {len(units)} test units")
     
     # 2. Create extractor pipeline with | operator
-    print(f"✓ Creating pipeline: summary | keyphrases | entities")
+    print("\n✓ Creating pipeline: summary | keyphrases | entities")
     
     extractor = (
         SummaryExtractor(
@@ -108,7 +113,7 @@ async def main():
     )
     
     # 3. Run transformation
-    print("\n⏳ Running transformation pipeline...")
+    print("\n⏳ Running transformation...")
     enriched_units = await extractor.transform(units, max_concurrency=5)
     
     print(f"✓ Transformation completed")

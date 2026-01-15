@@ -165,7 +165,7 @@ class BaseUnit(BaseModel):
     # Semantic relationships (stored as ID lists)
     relations: dict[str, list[str]] = Field(default_factory=dict)
     
-    # Extracted properties (populated by TransformPipeline)
+    # Extracted properties (populated by extractors)
     summary: Optional[str] = None
     keyphrases: Optional[list[str]] = None
     entities: Optional[list[str]] = None

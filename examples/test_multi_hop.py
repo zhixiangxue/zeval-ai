@@ -11,7 +11,6 @@ from rich.panel import Panel
 from rich.console import Console
 
 from zeval.synthetic_data.transforms.extractors import KeyphrasesExtractor, EntitiesExtractor, SummaryExtractor
-from zeval.synthetic_data.transforms.pipeline import TransformPipeline
 from zeval.synthetic_data.generators.persona import Persona, generate_personas
 from zeval.synthetic_data.generators.multi_hop import generate_multi_hop
 from zeval.synthetic_data.graphs import KeyphraseOverlapBuilder
@@ -143,14 +142,12 @@ async def main():
     
     # Step 2: Enrich units
     rprint("\n[bold][Step 2][/bold] Enriching units...")
-    pipeline = TransformPipeline(
-        extractors=[
-            SummaryExtractor(model_uri=llm_uri, api_key=api_key),
-            KeyphrasesExtractor(model_uri=llm_uri, api_key=api_key, max_num=5),
-            EntitiesExtractor(model_uri=llm_uri, api_key=api_key, max_num=5),
-        ]
+    extractor = (
+        SummaryExtractor(model_uri=llm_uri, api_key=api_key)
+        | KeyphrasesExtractor(model_uri=llm_uri, api_key=api_key, max_num=5)
+        | EntitiesExtractor(model_uri=llm_uri, api_key=api_key, max_num=5)
     )
-    enriched_units = await pipeline.transform(units)
+    enriched_units = await extractor.transform(units)
     rprint(f"[green]✓[/green] Enriched {len(enriched_units)} units")
     
     # Display extracted keyphrases (for debugging)
