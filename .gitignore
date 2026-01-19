@@ -211,3 +211,5 @@ tmp/
 playground/
 .qoder/
 output/
+design/
+zeval-service/
