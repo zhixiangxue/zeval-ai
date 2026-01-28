@@ -35,6 +35,7 @@ dependencies = [
     "markitdown>=0.0.1a2",
     "mineru>=2.7.1",
     "xxhash>=3.5.0",
+    "chonkie>=1.0.0",
 ]
 
 [project.optional-dependencies]

@@ -5,7 +5,8 @@ PDF document schema
 from typing import Any
 from pydantic import Field
 
-from .base import PageableDocument, UnitCollection
+from .document import PageableDocument
+from .unit import UnitCollection
 
 
 class PDF(PageableDocument):

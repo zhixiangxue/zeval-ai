@@ -7,7 +7,8 @@ from pathlib import Path
 from markitdown import MarkItDown
 
 from .base import BaseReader
-from ...schemas.base import BaseDocument, DocumentMetadata
+from ...schemas.document import BaseDocument
+from ...schemas.metadata import DocumentMetadata
 from ...schemas.pdf import PDF
 from ...schemas.markdown import Markdown
 from ...utils.source import SourceUtils, FileType, SourceInfo

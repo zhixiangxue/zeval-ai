@@ -43,12 +43,12 @@ async def main():
     """Test multi-hop generation"""
     
     # Check for API key
-    api_key = os.getenv("BAILIAN_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        print("Error: BAILIAN_API_KEY environment variable not set")
+        print("Error: OPENAI_API_KEY environment variable not set")
         return
     
-    llm_uri = "bailian/qwen-plus"
+    llm_uri = "openai/gpt-4o-mini"
     
     rprint("\n" + "="*60)
     rprint("[bold cyan]Testing Multi-Hop Question Generation[/bold cyan]")
@@ -191,7 +191,7 @@ async def main():
     
     # Optional: Enable strict filtering (uncomment to test)
     # filter = GeneralFilter(
-    #     uri="bailian/qwen-max",  # Use larger model for judgment
+    #     uri="openai/gpt-4o",  # Use larger model for judgment
     #     api_key=api_key,
     #     concurrency=3
     # )

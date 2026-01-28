@@ -10,7 +10,7 @@ This script demonstrates the complete workflow:
 7. Generate analysis report
 
 Prerequisites:
-    - BAILIAN_API_KEY environment variable must be set
+    - OPENAI_API_KEY environment variable must be set
     - A sample PDF file (will be downloaded if not exists)
 
 Usage:
@@ -47,7 +47,7 @@ load_dotenv()
 
 # Import all required components
 from zeval.synthetic_data.readers.docling import DoclingReader
-from zeval.synthetic_data.splitters.markdown import MarkdownHeaderSplitter
+from zeval.synthetic_data.splitters import MarkdownHeaderSplitter
 from zeval.synthetic_data.transforms.extractors import (
     SummaryExtractor,
     KeyphrasesExtractor,
@@ -216,33 +216,46 @@ async def main():
     console.print("="*80 + "\n")
     
     # Check API key
-    api_key = os.getenv("BAILIAN_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        console.print("[red]✗ Error: BAILIAN_API_KEY not found in environment[/red]")
+        console.print("[red]✗ Error: OPENAI_API_KEY not found in environment[/red]")
         console.print("  Please set it in your .env file or environment")
         return
     
-    llm_uri = "bailian/qwen-plus"
+    llm_uri = "openai/gpt-4o-mini"
     
-    # Setup paths
+    # ============================================================================
+    # Interactive PDF Input
+    # ============================================================================
+    console.print("[bold]请输入PDF文件路径:[/bold]")
+    pdf_input = input("> ").strip()
+    
+    if not pdf_input:
+        console.print("[red]✗ Error: PDF path cannot be empty[/red]")
+        return
+    
+    # Clean path: remove PowerShell artifacts and quotes
+    # PowerShell may add "& '" prefix for paths with spaces
+    if pdf_input.startswith("& '") or pdf_input.startswith('& "'):
+        pdf_input = pdf_input[3:]  # Remove "& '" or '& "'
+    
+    # Remove quotes (from drag-and-drop or PowerShell)
+    pdf_input = pdf_input.strip('"').strip("'")
+    
+    pdf_path = Path(pdf_input)
+    if not pdf_path.exists():
+        console.print(f"[red]✗ Error: PDF file not found: {pdf_path}[/red]")
+        return
+    
+    # Setup output paths
     workspace = Path.cwd()
-    tmp_dir = workspace / "tmp"
     output_base_dir = workspace / "output"
-    tmp_dir.mkdir(exist_ok=True)
     output_base_dir.mkdir(exist_ok=True)
     
     # Create timestamped report directory for this run
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     report_dir = output_base_dir / f"report_{timestamp}"
     report_dir.mkdir(parents=True, exist_ok=True)
-    
-    # PDF path - use the provided Thunderbird document
-    pdf_path = tmp_dir / "Thunderbird Product Overview 2025 - No Doc.pdf"
-    
-    if not pdf_path.exists():
-        console.print(f"[red]✗ Error: PDF file not found: {pdf_path}[/red]")
-        console.print("  Please place the PDF file in the tmp/ directory")
-        return
     
     console.print(Panel.fit(
         f"[bold]Configuration[/bold]\n\n"

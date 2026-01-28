@@ -1,9 +1,9 @@
 """
-Docling reader for advanced PDF understanding
+Docling reader for PDF understanding
 """
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.base_models import InputFormat
@@ -11,67 +11,26 @@ from docling.datamodel.pipeline_options import PdfPipelineOptions, VlmPipelineOp
 from docling.pipeline.vlm_pipeline import VlmPipeline
 
 from .base import BaseReader
-from ...schemas.base import BaseDocument, DocumentMetadata, Page
+from ...schemas.document import BaseDocument, Page
+from ...schemas.metadata import DocumentMetadata
 from ...schemas.pdf import PDF
 from ...utils.source import SourceUtils, FileType, SourceInfo
 
 
 class DoclingReader(BaseReader):
     """
-    Reader using Docling library for advanced PDF understanding
-    
-    Features:
-    - Deep layout analysis and reading order preservation
-    - Table structure recognition
-    - Figure detection and classification
-    - Formula recognition
-    - Bounding box information
-    - Support for VLM (Vision Language Model) pipeline
-    - Configurable OCR options
+    Reader using Docling library for PDF understanding
     
     Returns PDF document with:
-    - content: Full markdown representation
-    - pages: List of Page objects with structured data
-        - Each page.content: Dict with texts, tables, pictures
-        - Each page.metadata: Layout and provenance info
+    - content: Full markdown representation of the entire document
+    - pages: List of Page objects, each containing that page's markdown text
     
     Usage:
         # Basic usage - default standard pipeline
         reader = DoclingReader()
         doc = reader.read("path/to/file.pdf")
         
-        # Use VLM pipeline with local model
-        from docling.datamodel.pipeline_options import VlmPipelineOptions
-        from docling.datamodel import vlm_model_specs
-        
-        vlm_options = VlmPipelineOptions(
-            vlm_options=vlm_model_specs.SMOLDOCLING_MLX
-        )
-        reader = DoclingReader(vlm_pipeline_options=vlm_options)
-        
-        # Use VLM pipeline with remote API (e.g., Alibaba Qwen-VL)
-        from docling.datamodel.pipeline_options import VlmPipelineOptions
-        from docling.datamodel.pipeline_options_vlm_model import ApiVlmOptions, ResponseFormat
-        
-        vlm_options = VlmPipelineOptions(
-            enable_remote_services=True,
-            vlm_options=ApiVlmOptions(
-                url="https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
-                params=dict(
-                    model="qwen-vl-max-latest",  # or qwen-vl-plus, qwen2-vl-7b-instruct
-                    max_tokens=4096,
-                ),
-                headers={
-                    "Authorization": "Bearer YOUR_API_KEY",  # Replace with your API key
-                },
-                prompt="Convert this page to markdown.",
-                timeout=90,
-                response_format=ResponseFormat.MARKDOWN,
-            )
-        )
-        reader = DoclingReader(vlm_pipeline_options=vlm_options)
-        
-        # Custom standard PDF pipeline options
+        # Custom PDF pipeline options
         from docling.datamodel.pipeline_options import PdfPipelineOptions
         
         pdf_options = PdfPipelineOptions(
@@ -80,7 +39,13 @@ class DoclingReader(BaseReader):
         )
         reader = DoclingReader(pdf_pipeline_options=pdf_options)
         
-        # GPU acceleration (configure via pipeline options)
+        # Use VLM pipeline
+        from docling.datamodel.pipeline_options import VlmPipelineOptions
+        
+        vlm_options = VlmPipelineOptions(...)
+        reader = DoclingReader(vlm_pipeline_options=vlm_options)
+        
+        # GPU acceleration
         from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
         
         pdf_options = PdfPipelineOptions()
@@ -164,13 +129,13 @@ class DoclingReader(BaseReader):
     
     def read(self, source: str) -> BaseDocument:
         """
-        Read and convert a file to PDF document with structured data
+        Read and convert a file to PDF document
         
         Args:
             source: File path (relative/absolute) or URL
             
         Returns:
-            PDF document with markdown content and structured pages
+            PDF document with markdown content and page list
             
         Raises:
             ValueError: If source is invalid or file format is not supported
@@ -196,11 +161,11 @@ class DoclingReader(BaseReader):
         # Extract markdown content
         markdown_content = docling_doc.export_to_markdown()
         
-        # Build structured pages
+        # Build pages (each page contains its markdown text)
         pages = self._extract_pages(docling_doc)
         
         # Build metadata
-        metadata = self._build_metadata(info, markdown_content, docling_doc)
+        metadata = self._build_metadata(info, markdown_content, len(pages))
         
         # Create PDF document
         return PDF(
@@ -209,153 +174,56 @@ class DoclingReader(BaseReader):
             pages=pages
         )
     
-    def _extract_pages(self, docling_doc: Any) -> list[Page]:
+    def _extract_pages(self, docling_doc) -> list[Page]:
         """
-        Extract structured page data from DoclingDocument
+        Extract pages from DoclingDocument
+        
+        Simply exports each page's Markdown content using Docling's native export.
+        No complex manual grouping - just use the library's capability.
         
         Args:
             docling_doc: The DoclingDocument object
             
         Returns:
-            List of Page objects with structured content
+            List of Page objects with Markdown content
         """
         pages = []
         
-        # Group items by page number
-        page_items = {}
+        # Get page count from document
+        # Note: doc.pages is a dict in Docling, keys are page numbers
+        if hasattr(docling_doc, 'pages') and docling_doc.pages:
+            page_numbers = sorted(docling_doc.pages.keys())
+        else:
+            # Fallback: try to infer from items
+            page_numbers = set()
+            for item in docling_doc.texts:
+                if hasattr(item, 'prov') and item.prov:
+                    for prov in item.prov:
+                        if hasattr(prov, 'page_no'):
+                            page_numbers.add(prov.page_no)
+            page_numbers = sorted(page_numbers) if page_numbers else [1]
         
-        # Process texts
-        for text_item in docling_doc.texts:
-            page_num = self._get_page_number(text_item)
-            if page_num not in page_items:
-                page_items[page_num] = {
-                    'texts': [],
-                    'tables': [],
-                    'pictures': []
-                }
-            page_items[page_num]['texts'].append({
-                'text': text_item.text if hasattr(text_item, 'text') else str(text_item),
-                'type': text_item.label if hasattr(text_item, 'label') else 'text',
-                'bbox': self._extract_bbox(text_item)
-            })
-        
-        # Process tables
-        for table_item in docling_doc.tables:
-            page_num = self._get_page_number(table_item)
-            if page_num not in page_items:
-                page_items[page_num] = {
-                    'texts': [],
-                    'tables': [],
-                    'pictures': []
-                }
-            page_items[page_num]['tables'].append({
-                'data': self._extract_table_data(table_item),
-                'bbox': self._extract_bbox(table_item)
-            })
-        
-        # Process pictures
-        for picture_item in docling_doc.pictures:
-            page_num = self._get_page_number(picture_item)
-            if page_num not in page_items:
-                page_items[page_num] = {
-                    'texts': [],
-                    'tables': [],
-                    'pictures': []
-                }
-            page_items[page_num]['pictures'].append({
-                'caption': picture_item.caption.text if hasattr(picture_item, 'caption') and picture_item.caption else None,
-                'bbox': self._extract_bbox(picture_item)
-            })
-        
-        # Create Page objects
-        for page_num in sorted(page_items.keys()):
-            items = page_items[page_num]
+        # Create Page objects using Docling's native export
+        for page_num in page_numbers:
+            # Export page content using Docling's native export
+            page_content = docling_doc.export_to_markdown(page_no=page_num)
+            
             pages.append(Page(
                 page_number=page_num,
-                content=items,
-                metadata={
-                    'text_count': len(items['texts']),
-                    'table_count': len(items['tables']),
-                    'picture_count': len(items['pictures'])
-                }
+                content=page_content,
+                metadata={}
             ))
         
         return pages
     
-    def _get_page_number(self, item: Any) -> int:
+    def _build_metadata(self, info: SourceInfo, content: str, page_count: int) -> DocumentMetadata:
         """
-        Extract page number from item
-        
-        Args:
-            item: DocItem from DoclingDocument
-            
-        Returns:
-            Page number (1-based), defaults to 1 if not found
-        """
-        # Try to get page number from prov (provenance)
-        if hasattr(item, 'prov') and item.prov:
-            for prov in item.prov:
-                if hasattr(prov, 'page_no'):
-                    return prov.page_no
-        
-        # Default to page 1
-        return 1
-    
-    def _extract_bbox(self, item: Any) -> dict[str, float] | None:
-        """
-        Extract bounding box from item
-        
-        Args:
-            item: DocItem from DoclingDocument
-            
-        Returns:
-            Dict with bbox coordinates or None
-        """
-        if hasattr(item, 'prov') and item.prov:
-            for prov in item.prov:
-                if hasattr(prov, 'bbox'):
-                    bbox = prov.bbox
-                    return {
-                        'l': bbox.l,
-                        't': bbox.t,
-                        'r': bbox.r,
-                        'b': bbox.b
-                    }
-        return None
-    
-    def _extract_table_data(self, table_item: Any) -> dict[str, Any]:
-        """
-        Extract table data structure
-        
-        Args:
-            table_item: TableItem from DoclingDocument
-            
-        Returns:
-            Dict with table structure and data
-        """
-        result = {
-            'grid': None,
-            'markdown': None
-        }
-        
-        # Try to get table grid
-        if hasattr(table_item, 'data') and table_item.data:
-            result['grid'] = table_item.data.grid if hasattr(table_item.data, 'grid') else None
-        
-        # Try to export as markdown
-        if hasattr(table_item, 'export_to_markdown'):
-            result['markdown'] = table_item.export_to_markdown()
-        
-        return result
-    
-    def _build_metadata(self, info: SourceInfo, content: str, docling_doc: Any) -> DocumentMetadata:
-        """
-        Build metadata object from SourceInfo and DoclingDocument
+        Build metadata object from SourceInfo
         
         Args:
             info: SourceInfo from validation
             content: Document content
-            docling_doc: The DoclingDocument object
+            page_count: Number of pages
             
         Returns:
             DocumentMetadata object
@@ -368,17 +236,6 @@ class DoclingReader(BaseReader):
             except Exception:
                 pass
         
-        # Extract custom docling metadata
-        custom = {
-            'text_items_count': len(docling_doc.texts),
-            'table_items_count': len(docling_doc.tables),
-            'picture_items_count': len(docling_doc.pictures)
-        }
-        
-        # Add document name if available
-        if hasattr(docling_doc, 'name') and docling_doc.name:
-            custom['doc_name'] = docling_doc.name
-        
         return DocumentMetadata(
             source=info.source,
             source_type=info.source_type.value,
@@ -389,5 +246,5 @@ class DoclingReader(BaseReader):
             content_length=len(content),
             mime_type=info.mime_type if info.mime_type else None,
             reader_name="DoclingReader",
-            custom=custom
+            custom={"page_count": page_count}
         )

@@ -19,9 +19,9 @@ async def main():
     """Test filtering on multi-hop dataset"""
     
     # Check for API key
-    api_key = os.getenv("BAILIAN_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        print("Error: BAILIAN_API_KEY environment variable not set")
+        print("Error: OPENAI_API_KEY environment variable not set")
         return
     
     # Load the generated dataset
@@ -33,7 +33,7 @@ async def main():
     
     # Create filter
     filter = GeneralFilter(
-        uri="bailian/qwen-plus",  # Use qwen-plus for better judgment
+        uri="openai/gpt-4o-mini",  # Use GPT-4o-mini for judgment
         api_key=api_key,
         concurrency=3              # Don't overwhelm the API
     )

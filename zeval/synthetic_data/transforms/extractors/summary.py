@@ -5,7 +5,7 @@ Summary extractor
 from pydantic import BaseModel
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from .base import BaseExtractor
-from ....schemas.base import BaseUnit
+from ....schemas.unit import BaseUnit
 
 
 class SummarySchema(BaseModel):

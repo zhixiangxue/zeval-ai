@@ -6,7 +6,7 @@ import xxhash
 from abc import ABC, abstractmethod
 from pathlib import Path
 
-from ...schemas.base import BaseDocument
+from ...schemas.document import BaseDocument
 
 
 class BaseReader(ABC):

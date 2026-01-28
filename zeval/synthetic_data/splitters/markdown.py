@@ -1,15 +1,13 @@
 """
-Header-based markdown splitter
-Split markdown content by headers (H1-H6)
-Inspired by LlamaIndex's MarkdownNodeParser
+Markdown splitters with different strategies
 """
 
 import re
 from typing import Optional
 
-from ..base import BaseSplitter
-from ....schemas.base import BaseUnit, UnitMetadata
-from ....schemas.unit import TextUnit
+from .base import BaseSplitter
+from ...schemas.unit import BaseUnit, TextUnit
+from ...schemas.metadata import UnitMetadata
 
 
 class MarkdownHeaderSplitter(BaseSplitter):
@@ -50,18 +48,18 @@ class MarkdownHeaderSplitter(BaseSplitter):
         self.header_path_separator = header_path_separator
         self.include_header_in_content = include_header_in_content
     
-    def _do_split(self, document) -> list[BaseUnit]:
+    def _do_split(self, input_data) -> list[BaseUnit]:
         """
         Split markdown document by headers
         
         Args:
-            document: Document with markdown content
+            input_data: Document with markdown content
             
         Returns:
             List of TextUnits with context_path metadata
         """
         # Get content
-        content = document.content if hasattr(document, 'content') else ""
+        content = input_data.content if hasattr(input_data, 'content') else ""
         
         units = []
         lines = content.split("\n")
@@ -86,7 +84,7 @@ class MarkdownHeaderSplitter(BaseSplitter):
                         units.append(
                             self._build_unit_from_split(
                                 current_section.strip(),
-                                document,
+                                input_data,
                                 header_stack,
                             )
                         )
@@ -115,7 +113,7 @@ class MarkdownHeaderSplitter(BaseSplitter):
             units.append(
                 self._build_unit_from_split(
                     current_section.strip(),
-                    document,
+                    input_data,
                     header_stack,
                 )
             )
@@ -128,15 +126,15 @@ class MarkdownHeaderSplitter(BaseSplitter):
                 units[i].next_unit_id = units[i + 1].unit_id
             
             # Set source document ID
-            if hasattr(document, 'doc_id'):
-                units[i].source_doc_id = document.doc_id
+            if hasattr(input_data, 'doc_id'):
+                units[i].source_doc_id = input_data.doc_id
         
         return units
     
     def _build_unit_from_split(
         self,
         text_split: str,
-        document,
+        input_data,
         header_stack: list[tuple[int, str]],
     ) -> TextUnit:
         """
@@ -144,7 +142,7 @@ class MarkdownHeaderSplitter(BaseSplitter):
         
         Args:
             text_split: Content of this section
-            document: Source document
+            input_data: Source document
             header_stack: Stack of headers (including current)
             
         Returns:

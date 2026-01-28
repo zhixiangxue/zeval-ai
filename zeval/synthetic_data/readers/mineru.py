@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Any, Optional, Literal
 
 from .base import BaseReader
-from ...schemas.base import BaseDocument, DocumentMetadata, Page
+from ...schemas.document import BaseDocument, Page
+from ...schemas.metadata import DocumentMetadata
 from ...schemas.pdf import PDF
 from ...utils.source import SourceUtils, FileType, SourceInfo
 
@@ -34,8 +35,8 @@ class MinerUReader(BaseReader):
     - vlm-http-client: Remote VLM API, requires server_url
     
     Returns PDF document with:
-    - content: Full markdown representation
-    - pages: List of Page objects with structured data
+    - content: Full markdown representation of the entire document
+    - pages: List of Page objects, each containing that page's markdown text
     - metadata: Document and parsing information
     
     Usage:
@@ -268,19 +269,14 @@ class MinerUReader(BaseReader):
             
             if self.backend == "pipeline":
                 md_content = pipeline_union_make(pdf_info, MakeMode.MM_MD, image_dir)
-                content_list = pipeline_union_make(pdf_info, MakeMode.CONTENT_LIST, image_dir)
             else:
                 md_content = vlm_union_make(pdf_info, MakeMode.MM_MD, image_dir)
-                content_list = vlm_union_make(pdf_info, MakeMode.CONTENT_LIST, image_dir)
             
-            # Build pages from content_list
-            pages = self._build_pages_from_content_list(content_list)
-            
-            # Extract custom metadata
-            custom_metadata = self._extract_custom_metadata(middle_json)
+            # Build pages from pdf_info (each page gets its markdown content)
+            pages = self._build_pages_from_pdf_info(pdf_info, image_dir)
         
         # Build metadata
-        metadata = self._build_metadata(info, md_content, custom_metadata)
+        metadata = self._build_metadata(info, md_content, len(pages))
         
         # Create PDF document
         return PDF(
@@ -307,92 +303,46 @@ class MinerUReader(BaseReader):
             return info.source
     
 
-    def _build_pages_from_content_list(self, content_list: list[dict]) -> list[Page]:
+    def _build_pages_from_pdf_info(self, pdf_info: list[dict], image_dir: str) -> list[Page]:
         """
-        Build Page objects from MinerU content_list
+        Build Page objects from MinerU pdf_info
         
         Args:
-            content_list: Content list from MinerU output
+            pdf_info: PDF info list from MinerU output
+            image_dir: Image directory name
             
         Returns:
-            List of Page objects
+            List of Page objects, each containing that page's markdown text
         """
-        # Group by page number
-        page_items = {}
+        from mineru.utils.enum_class import MakeMode
+        from mineru.backend.pipeline.pipeline_middle_json_mkcontent import union_make as pipeline_union_make
+        from mineru.backend.vlm.vlm_middle_json_mkcontent import union_make as vlm_union_make
         
-        for item in content_list:
-            page_num = item.get("page_idx", 0) + 1  # Convert to 1-based
-            
-            if page_num not in page_items:
-                page_items[page_num] = {
-                    "texts": [],
-                    "tables": [],
-                    "images": []
-                }
-            
-            # Classify item type
-            item_type = item.get("type", "text")
-            if item_type == "text":
-                page_items[page_num]["texts"].append({
-                    "text": item.get("text", ""),
-                    "type": item.get("layout_type", "text"),
-                    "bbox": item.get("bbox")
-                })
-            elif item_type == "table":
-                page_items[page_num]["tables"].append({
-                    "html": item.get("html"),
-                    "latex": item.get("latex"),
-                    "bbox": item.get("bbox")
-                })
-            elif item_type in ["image", "figure"]:
-                page_items[page_num]["images"].append({
-                    "path": item.get("img_path"),
-                    "caption": item.get("caption"),
-                    "bbox": item.get("bbox")
-                })
-        
-        # Create Page objects
         pages = []
-        for page_num in sorted(page_items.keys()):
-            items = page_items[page_num]
+        
+        # Process each page
+        for page_idx, page_data in enumerate(pdf_info):
+            # Generate markdown for this page only
+            page_pdf_info = [page_data]
+            
+            if self.backend == "pipeline":
+                page_md = pipeline_union_make(page_pdf_info, MakeMode.MM_MD, image_dir)
+            else:
+                page_md = vlm_union_make(page_pdf_info, MakeMode.MM_MD, image_dir)
+            
             pages.append(Page(
-                page_number=page_num,
-                content=items,
-                metadata={
-                    "text_count": len(items["texts"]),
-                    "table_count": len(items["tables"]),
-                    "image_count": len(items["images"])
-                }
+                page_number=page_idx + 1,
+                content=page_md,
+                metadata={}
             ))
         
         return pages
     
-    def _extract_custom_metadata(self, middle_json: dict) -> dict[str, Any]:
-        """
-        Extract custom metadata from MinerU middle JSON
-        
-        Args:
-            middle_json: Middle JSON from MinerU output
-            
-        Returns:
-            Dict of custom metadata
-        """
-        pdf_info = middle_json.get("pdf_info", [])
-        
-        return {
-            "page_count": len(pdf_info),
-            "backend": self.backend,
-            "parse_method": self.parse_method,
-            "lang": self.lang,
-            "formula_enabled": self.formula_enable,
-            "table_enabled": self.table_enable,
-        }
-    
     def _build_metadata(
         self, 
         info: SourceInfo, 
-        content: str, 
-        custom: dict[str, Any]
+        content: str,
+        page_count: int
     ) -> DocumentMetadata:
         """
         Build metadata object
@@ -400,7 +350,7 @@ class MinerUReader(BaseReader):
         Args:
             info: SourceInfo from validation
             content: Document content
-            custom: Custom metadata from MinerU
+            page_count: Number of pages
             
         Returns:
             DocumentMetadata object
@@ -412,6 +362,16 @@ class MinerUReader(BaseReader):
                 file_size = Path(info.source).stat().st_size
             except Exception:
                 pass
+        
+        # Build custom metadata
+        custom = {
+            "page_count": page_count,
+            "backend": self.backend,
+            "parse_method": self.parse_method,
+            "lang": self.lang,
+            "formula_enabled": self.formula_enable,
+            "table_enabled": self.table_enable,
+        }
         
         return DocumentMetadata(
             source=info.source,

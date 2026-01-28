@@ -3,7 +3,7 @@
 import networkx as nx
 from collections import Counter
 from .base import GraphBuilder
-from ...schemas.base import BaseUnit
+from ...schemas.unit import BaseUnit
 
 
 class EntityOverlapBuilder(GraphBuilder):

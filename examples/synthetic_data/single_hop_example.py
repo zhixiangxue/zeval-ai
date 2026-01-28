@@ -41,12 +41,12 @@ async def main():
     """Test single-hop generation"""
     
     # Check for API key
-    api_key = os.getenv("BAILIAN_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        print("Error: BAILIAN_API_KEY environment variable not set")
+        print("Error: OPENAI_API_KEY environment variable not set")
         return
     
-    llm_uri = "bailian/qwen-plus"
+    llm_uri = "openai/gpt-4o-mini"
     
     rprint("\n" + "="*60)
     rprint("[bold cyan]Testing Single-Hop Question Generation[/bold cyan]")

@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 import networkx as nx
-from ...schemas.base import BaseUnit
+from ...schemas.unit import BaseUnit
 
 
 class GraphBuilder(ABC):

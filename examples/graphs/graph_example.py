@@ -6,7 +6,8 @@ import asyncio
 import os
 from dotenv import load_dotenv
 from zeval.schemas.markdown import Markdown
-from zeval.schemas.base import DocumentMetadata, BaseUnit, UnitMetadata
+from zeval.schemas.metadata import DocumentMetadata, UnitMetadata
+from zeval.schemas.unit import BaseUnit
 from zeval.synthetic_data.transforms.extractors import (
     SummaryExtractor,
     KeyphrasesExtractor,
@@ -87,9 +88,9 @@ async def main():
     """Test graph building"""
     
     # Check for API key
-    api_key = os.getenv("BAILIAN_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        print("Error: BAILIAN_API_KEY environment variable not set")
+        print("Error: OPENAI_API_KEY environment variable not set")
         return
     
     print("\n" + "="*60)
@@ -103,12 +104,12 @@ async def main():
     # 2. Extract properties (keyphrases and entities)
     extractors = [
         KeyphrasesExtractor(
-            model_uri="bailian/qwen-plus",
+            model_uri="openai/gpt-4o-mini",
             api_key=api_key,
             max_num=5
         ),
         EntitiesExtractor(
-            model_uri="bailian/qwen-plus",
+            model_uri="openai/gpt-4o-mini",
             api_key=api_key,
             max_num=5
         )
@@ -116,8 +117,8 @@ async def main():
     
     print("\n⏳ Extracting keyphrases and entities...")
     extractor = (
-        KeyphrasesExtractor(model_uri="bailian/qwen-plus", api_key=api_key, max_num=5)
-        | EntitiesExtractor(model_uri="bailian/qwen-plus", api_key=api_key, max_num=5)
+        KeyphrasesExtractor(model_uri="openai/gpt-4o-mini", api_key=api_key, max_num=5)
+        | EntitiesExtractor(model_uri="openai/gpt-4o-mini", api_key=api_key, max_num=5)
     )
     enriched_units = await extractor.transform(units, max_concurrency=5)
     print("✓ Extraction completed")

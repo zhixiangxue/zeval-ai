@@ -33,9 +33,9 @@ async def main():
     """Test persona generation"""
     
     # Check for API key
-    api_key = os.getenv("BAILIAN_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        print("Error: BAILIAN_API_KEY environment variable not set")
+        print("Error: OPENAI_API_KEY environment variable not set")
         return
     
     print("\n" + "="*60)
@@ -47,7 +47,7 @@ async def main():
     print("-" * 60)
     
     personas = await generate_personas(
-        llm_uri="bailian/qwen-plus",
+        llm_uri="openai/gpt-4o-mini",
         api_key=api_key,
         domain="US residential real estate and home buying process",
         num_personas=5,

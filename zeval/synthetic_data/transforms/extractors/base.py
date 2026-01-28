@@ -13,7 +13,7 @@ from tenacity import (
     retry_if_exception_type
 )
 from rich.progress import Progress
-from ....schemas.base import BaseUnit
+from ....schemas.unit import BaseUnit
 
 
 class BaseExtractor(ABC):

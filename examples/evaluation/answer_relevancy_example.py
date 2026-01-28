@@ -93,11 +93,11 @@ async def main():
     
     # Step 2: Initialize metric
     console.print("[Step 2] Initializing answer relevancy metric...", style="yellow")
-    llm_uri = "bailian/qwen-plus"
-    api_key = os.getenv("BAILIAN_API_KEY", "")
+    llm_uri = "openai/gpt-4o-mini"
+    api_key = os.getenv("OPENAI_API_KEY", "")
     
     if not api_key:
-        console.print("✗ Error: BAILIAN_API_KEY not found in environment", style="red")
+        console.print("✗ Error: OPENAI_API_KEY not found in environment", style="red")
         return
     
     metric = AnswerRelevancy(llm_uri=llm_uri, api_key=api_key)

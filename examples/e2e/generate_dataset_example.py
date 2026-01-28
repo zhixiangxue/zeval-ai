@@ -59,7 +59,7 @@ load_dotenv()
 
 # Import required components (after dotenv)
 from zeval.synthetic_data.readers.docling import DoclingReader
-from zeval.synthetic_data.splitters.markdown import MarkdownHeaderSplitter
+from zeval.synthetic_data.splitters import MarkdownHeaderSplitter
 from zeval.synthetic_data.transforms.extractors import (
     SummaryExtractor,
     KeyphrasesExtractor,
@@ -213,7 +213,12 @@ async def main():
         console.print("[red]✗ Error: PDF path cannot be empty[/red]")
         return
     
-    # Remove quotes if present (from drag-and-drop in terminal)
+    # Clean path: remove PowerShell artifacts and quotes
+    # PowerShell may add "& '" prefix for paths with spaces
+    if pdf_input.startswith("& '") or pdf_input.startswith('& "'):
+        pdf_input = pdf_input[3:]  # Remove "& '" or '& "'
+    
+    # Remove quotes (from drag-and-drop or PowerShell)
     pdf_input = pdf_input.strip('"').strip("'")
     
     pdf_path = Path(pdf_input)
